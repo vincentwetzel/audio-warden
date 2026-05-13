@@ -13,11 +13,13 @@ struct Track {
     std::string title;
     std::string artist;
     std::string album;
+    unsigned int year = 0;
     int track_number = 0;
     
     // Quality Metrics
     int bitrate = 0;
     int sample_rate = 0;
+    int bits_per_sample = 0;
     
     // Fixes
     bool has_legacy_date_frames = false;

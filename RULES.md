@@ -7,16 +7,25 @@ This document outlines the file naming, tagging, and folder structure rules enfo
 AudioWarden currently enforces a focused subset of these rules:
 
 *   Scans `.mp3`, `.flac`, and `.wav` files under each path in `settings.txt`.
-*   Reads tags and audio properties with TagLib.
+*   Groups tracks by detected album folder before prompting.
+*   Reads tags and audio properties with TagLib, including year and FLAC bit
+    depth where available.
 *   Validates track filenames against `rules.json` `file_naming`.
-*   Detects configured `forbidden_characters` in filenames.
+*   Validates standard album folders as `YYYY - Album Name [Technical Info]`
+    when year and album tags are available.
+*   Validates category album folders as `Album Name [YYYY]` when the parent
+    folder is `soundtracks`, `childrens`, or `various artists`.
+*   Detects basic multi-disc album structures using `CD`, `Disc`, and `Vol`
+    subfolder prefixes.
+*   Suggests multi-disc subfolder separator cleanup, such as changing
+    underscores to ` - `.
 *   Detects legacy ID3v2 date frames (`TDAT`, `TYER`, `TIME`) when TagLib reports
     them.
-*   In interactive mode, can batch-rename files and save affected tags after
-    user approval.
+*   In interactive mode, can batch-rename folders, disc subfolders, files, and
+    save affected tags after user approval.
 
-Folder naming, album classification, banned `.lrc` handling, and synced-lyrics
-offset repair are still planned rule areas.
+Configurable album classification, banned `.lrc` handling, standalone single
+detection, and synced-lyrics offset repair are still planned rule areas.
 
 ## Core Philosophy: User Approval Required
 
@@ -50,10 +59,10 @@ The implemented filename validator reads the `file_naming` value from
 *   `{Title}`: embedded title, or `Unknown Title` when unavailable.
 *   `{ext}`: the file extension without the leading dot.
 
-Before proposing a filename, AudioWarden removes configured forbidden characters
-from the title portion and replaces OS-invalid filename characters with
-underscores. This includes angle brackets, colon, double quote, pipe, question
-mark, asterisk, forward slash, and backslash.
+Before proposing a filename, AudioWarden replaces colons in the title portion
+with ` - `, collapses double spaces, and replaces OS-invalid filename
+characters with underscores. This includes angle brackets, double quote, pipe,
+question mark, asterisk, forward slash, and backslash.
 
 ### Singles & Non-Album Tracks
 There will sometimes be files that are **not** a part of an album (e.g., loose singles, sound bites, or independent tracks). These files are permitted to ignore the strict album naming rule.
@@ -93,9 +102,10 @@ The primary format for album folders is:
 **Automatic Generation of Technical Info:**
 If the `[Technical Info]` is missing or incomplete (e.g., `[mp3]`), AudioWarden will analyze the audio files within the folder to determine the correct codec, bit depth, sample rate, and average bitrate. It will then suggest the correctly formatted folder name during an interactive scan.
 
-**Status:** Folder naming validation and technical-info generation are planned.
-The current pipeline includes a placeholder folder phase but does not propose
-folder renames.
+**Status:** Basic folder naming validation and technical-info generation are
+implemented for detected album folders. The current implementation derives
+folder names from embedded year and album tags, then prompts before applying a
+folder rename in interactive mode.
 
 ##### Category Album Folders (within non-Artist directories)
 If an album appears in a category folder (e.g., `soundtracks/`, `childrens/`) instead of an artist folder, an alternative naming format is permitted:
@@ -103,6 +113,24 @@ If an album appears in a category folder (e.g., `soundtracks/`, `childrens/`) in
 `Album Name [YYYY]`
 
 **Example:** The folder `Disney Travel Songs [1994]` is valid inside `J:\Audio\Music\childrens\`.
+
+**Status:** Category album validation is implemented for parent folders named
+`soundtracks`, `childrens`, or `various artists`. The category list is currently
+hard-coded and should move into configuration later.
+
+### Multi-Disc Subfolders
+
+AudioWarden currently treats album subfolders beginning with `CD`, `Disc`, or
+`Vol` as disc folders. When all subfolders are disc folders, the parent is
+processed as one multi-disc album.
+
+Disc subfolder names may include a title after the disc number, but the
+separator should be ` - `.
+
+**Example:** `Vol. 01 - Live Set`
+
+**Status:** Basic multi-disc detection and separator cleanup prompts are
+implemented. The accepted disc-prefix patterns are currently hard-coded.
 
 ## Banned Files
 
@@ -115,7 +143,7 @@ If AudioWarden detects an `.lrc` file associated with an audio track (e.g., `son
 During interactive mode, the app will prompt the user for permission to read the contents of the `.lrc` file and embed the lyrics directly into the metadata of the corresponding audio track. Upon successful embedding, the standalone `.lrc` file should be deleted.
 
 **Status:** `.lrc` detection and embedding are planned. The current scanner only
-queues `.mp3`, `.flac`, and `.wav` files.
+uses `.mp3`, `.flac`, and `.wav` files when detecting and processing albums.
 
 ## Embedded Lyrics & Subtitles
 
