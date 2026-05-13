@@ -1,0 +1,15 @@
+# Local configuration
+settings.txt
+settings.json
+
+# Editor/workspace configuration
+.vscode/
+launch.json
+tasks.json
+
+# Build output
+build/
+.git-local/
+.gitmanual/
+*.bundle
+*.bundle.lock

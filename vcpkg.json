@@ -1,0 +1,9 @@
+{
+  "name": "audiowarden",
+  "version": "1.0.0",
+  "dependencies": [
+    "cli11",
+    "nlohmann-json",
+    "taglib"
+  ]
+}

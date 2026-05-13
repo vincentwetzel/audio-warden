@@ -1,0 +1,13 @@
+{
+  "folder_structure": "{AlbumArtist}/{Year} - {Album}/",
+  "file_naming": "{TrackNumber} - {Title}.{ext}",
+  "enforce_tags": [
+    "Title",
+    "Artist",
+    "Album",
+    "Year",
+    "TrackNumber"
+  ],
+  "capitalization": "TitleCase",
+  "forbidden_characters": ["!", "?"]
+}
