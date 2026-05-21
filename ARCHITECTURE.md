@@ -1,10 +1,11 @@
 # System Architecture
 
-AudioWarden is currently a single-binary C++17 CLI application with the scanner,
-validator, prompter, and modifier behavior implemented in `main.cpp`. The
-conceptual subsystem boundaries are still documented in `AGENTS.md`, but the
-physical code has not yet been split into separate `scanner.cpp`,
-`validator.cpp`, `prompter.cpp`, or `modifier.cpp` translation units.
+AudioWarden is currently a single-binary C++17 CLI application. The CLI
+bootstrap now lives in `main.cpp`, while the existing scanner, validator,
+prompter, and modifier pipeline is exposed through `app.h` and compiled via
+`audio_warden.cpp`. The long pipeline implementation remains transitional in
+`audio_warden_pipeline.inl` until it is split into dedicated scanner,
+validator, prompter, and modifier translation units.
 
 ## 1. Technology Stack
 
@@ -74,7 +75,10 @@ The CLI requires `--rules` / `-r` and supports:
      so prompts remain readable.
    * Parse CLI arguments via CLI11.
    * Load JSON rules and library roots from `settings.txt`.
-2. **Discovery Thread**
+2. **Library Pipeline (`audio_warden_pipeline.inl`)**
+   * `scan_library` owns the current end-to-end album scan, validation prompt,
+     and approved-write flow.
+3. **Discovery Thread**
    * Recursively traverses each configured library root with
      `std::filesystem::recursive_directory_iterator`.
    * Builds an alphabetized list of directories and queues album folders instead
@@ -84,7 +88,7 @@ The CLI requires `--rules` / `-r` and supports:
      containing audio.
    * Marks direct disc subfolders as processed children so multi-disc albums are
      handled as one album.
-3. **Worker Threads**
+4. **Worker Threads**
    * Pop album folders and collect `.mp3`, `.flac`, and `.wav` tracks from the
      album root and recognized disc subfolders.
    * Use `TagLib::FileRef` to read title, artist, album, year, track number,
@@ -92,7 +96,7 @@ The CLI requires `--rules` / `-r` and supports:
    * Apply a hard-coded category-album heuristic for parent folders named
      `soundtracks`, `childrens`, or `various artists`.
    * Push populated `Album` objects into a thread-safe queue.
-4. **Folder Validation and Prompts**
+5. **Folder Validation and Prompts**
    * Builds expected standard album folder names from tag year, tag album name,
      and detected technical info: `YYYY - Album Name [Technical Info]`.
    * Builds category album folder names as `Album Name [YYYY]`.
@@ -104,7 +108,7 @@ The CLI requires `--rules` / `-r` and supports:
    * Detects missing, mismatched, or malformed technical-info blocks.
    * Detects multi-disc subfolder separator issues and proposes names using
      ` - ` instead of underscores or other separators.
-5. **Track Validation and Prompts**
+6. **Track Validation and Prompts**
    * Builds expected filenames from the configured `file_naming` template,
      currently replacing `{TrackNumber}`, `{Title}`, and `{ext}`.
    * Sanitizes proposed title text by replacing colons with ` - `, collapsing
@@ -113,7 +117,7 @@ The CLI requires `--rules` / `-r` and supports:
    * Reports space-vs-underscore differences as a specific mismatch reason when
      the normalized names otherwise match.
    * Reports legacy ID3v2 date frames as a batch warning.
-6. **Approved Writes**
+7. **Approved Writes**
    * In interactive mode, approved folder, subfolder, and filename batches are
      applied with `std::filesystem::rename`.
    * After folder or subfolder renames, in-memory track paths are updated before
@@ -125,10 +129,23 @@ The CLI requires `--rules` / `-r` and supports:
 ## 5. Planned Work
 
 The following documented rule areas are not yet implemented in the current
-single-file pipeline:
+pipeline:
 
 *   Configurable category-folder and disc-folder classification rules.
 *   Standalone single detection.
 *   `.lrc` detection, embedding, and deletion.
 *   Embedded synced-lyrics offset adjustment.
 *   Dedicated `Violation`, `ActionList`, rollback, and modifier abstractions.
+
+## 6. Codebase Guidelines
+
+### File Size Limits
+To ensure the codebase remains maintainable and to optimize context window usage for AI coding agents, all source files (`.cpp` and `.h`) have a **soft limit of a few hundred lines**.
+
+If a file begins to significantly exceed this limit, it is a strong indicator
+that it has taken on too many responsibilities and should be refactored into
+smaller, modular components following the subsystem boundaries outlined in
+`AGENTS.md`. `main.cpp` is now intentionally small; the remaining large
+transitional implementation is `audio_warden_pipeline.inl`, which should be the
+next target for extraction into scanner, validator, prompter, and modifier
+modules.

@@ -2,22 +2,29 @@
 
 To maintain a clean and modular C++ codebase, AudioWarden is divided into several conceptual "Agents" or Subsystems. Each subsystem has a single, strictly defined responsibility.
 
-These are current design boundaries, not yet one-to-one source files. The
-present implementation lives primarily in `main.cpp`, with shared data models in
-`models.h`.
+These are current design boundaries, not yet one-to-one source files. The CLI
+bootstrap lives in `main.cpp`, shared data models live in `models.h`, and the
+current end-to-end scan/validate/prompt/modify pipeline is exposed through
+`app.h` with its transitional implementation in `audio_warden_pipeline.inl`.
 
 ## 1. The Scanner (`LibraryScanner`)
 **Responsibility:** Discovery and categorization.
-*   Recursively traverses the target directory using `std::filesystem`.
+*   Recursively traverses the target directory using `std::filesystem`,
+    streaming discovered album folders immediately to worker threads.
 *   Currently identifies `.mp3`, `.flac`, and `.wav` files as valid audio tracks.
 *   Currently identifies album folders before tag parsing so albums can be
     validated as single units.
 *   Currently recognizes basic multi-disc structures when subfolders begin with
     `CD`, `Disc`, or `Vol`.
-*   Currently marks category albums when the parent folder name is
-    `soundtracks`, `childrens`, or `various artists`.
+*   Currently marks category albums when any ancestor folder name matches a
+    lower-cased entry in the `rules.json` `category_folders` list. If the rule is
+    omitted, the fallback list is `soundtracks`, `childrens`, and
+    `various artists`.
+*   Currently marks folders named `singles`, `loose tracks`, or `standalone` as
+    standalone directories so their track filenames can omit the track-number
+    prefix.
 *   Planned: identify banned files (e.g., `.lrc`) and ignored files.
-*   Planned: make category folders and disc-folder patterns configurable.
+*   Planned: make disc-folder patterns configurable.
 *   *Constraint:* Purely read-only. Parses paths and groups files logically into `Album` or `Track` objects.
 
 ## 2. The Validator (`RuleValidator`)
@@ -26,13 +33,20 @@ present implementation lives primarily in `main.cpp`, with shared data models in
 *   Uses `TagLib` to read embedded metadata and audio properties.
 *   Currently reads track title, artist, album, year, track number, bitrate,
     sample rate, and FLAC bit depth.
+*   Currently distinguishes original year from release year when
+    `ORIGINALYEAR` or `ORIGINALDATE` is available, falling back to TagLib's
+    standard year otherwise.
 *   Currently cross-references filenames against the `rules.json`
     `file_naming` template.
 *   Currently validates album folder names against standard album and category
     album conventions when enough tag data is available.
 *   Currently checks multi-disc subfolder separators and proposes normalized
     names such as `Vol. 01 - Title`.
-*   Currently detects legacy ID3v2 date-frame warnings (`TDAT`, `TYER`, `TIME`) from TagLib debug output.
+*   Currently detects legacy ID3v2 date-frame warnings (`TDAT`, `TYER`, `TIME`,
+    `TORY`, `TRDA`) from TagLib debug output.
+*   Currently warns about likely re-release/remaster albums when the folder year
+    is at least ten years earlier than the release year tag and the original
+    year tag does not already match the folder year.
 *   Planned: generate formal `Violation` objects (e.g., `MissingTechnicalInfo`, `BannedOffsetDetected`, `TrackNamingMismatch`).
 *   *Constraint:* Purely read-only. It only suggests fixes; it does not apply them.
 
@@ -43,7 +57,9 @@ present implementation lives primarily in `main.cpp`, with shared data models in
     directory-level **Batch Prompts**.
 *   Accepts user input to approve or skip the suggested batch fixes.
 *   Planned: manual adjustment of proposed fixes and formal `ActionList` output.
-*   *Constraint:* Should not interact with the filesystem directly. In the current `main.cpp` implementation, prompting and execution are still adjacent and should be separated during modularization.
+*   *Constraint:* Should not interact with the filesystem directly. In the
+    current pipeline implementation, prompting and execution are still adjacent
+    and should be separated during modularization.
 
 ## 4. The Modifier (`FileSystemModifier` / `TagModifier`)
 **Responsibility:** Execution of approved changes.
@@ -52,6 +68,8 @@ present implementation lives primarily in `main.cpp`, with shared data models in
     with `std::filesystem::rename`.
 *   Currently executes approved file renames with `std::filesystem::rename`.
 *   Currently executes approved legacy tag cleanup with `TagLib::FileRef::save()`.
+*   Currently executes approved original-year tag updates and optional album
+    edition suffix updates with TagLib property/tag writes.
 *   Planned: receive heavily vetted and user-approved `ActionList` commands.
 *   Planned: synced-lyrics updates, folder changes, rollback capabilities, and stronger mid-batch recovery.
 
@@ -66,5 +84,6 @@ present implementation lives primarily in `main.cpp`, with shared data models in
 The implemented scanner uses one discovery thread to queue album folder paths
 and a worker pool sized from `std::thread::hardware_concurrency()` to read tags
 for all tracks in each album. Parsed `Album` objects are returned through a
-thread-safe queue. The main thread presents folder-level violations first, then
-file-level and legacy-tag violations after the folder pass completes.
+thread-safe queue. The main thread presents folder-level violations immediately
+as each album is popped from the queue, then proceeds to file-level and
+legacy-tag violations after the folder pass completes.

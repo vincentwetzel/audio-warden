@@ -1,6 +1,18 @@
 {
   "folder_structure": "{AlbumArtist}/{Year} - {Album}/",
   "file_naming": "{TrackNumber} - {Title}.{ext}",
+  "category_folders": [
+    "soundtracks",
+    "childrens",
+    "various artists",
+    "video game"
+  ],
+  "standalone_folders": [
+    "singles",
+    "loose tracks",
+    "standalone",
+    "mixes"
+  ],
   "enforce_tags": [
     "Title",
     "Artist",

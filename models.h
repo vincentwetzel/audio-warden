@@ -14,6 +14,7 @@ struct Track {
     std::string artist;
     std::string album;
     unsigned int year = 0;
+    unsigned int release_year = 0;
     int track_number = 0;
     
     // Quality Metrics
@@ -30,4 +31,5 @@ struct Album {
     std::vector<Track> tracks;
     bool is_multi_disc = false;
     bool is_category_album = false;
+    bool is_standalone_dir = false;
 };

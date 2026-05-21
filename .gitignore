@@ -13,3 +13,5 @@ build/
 .gitmanual/
 *.bundle
 *.bundle.lock
+
+run.bat

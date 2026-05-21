@@ -9,5 +9,8 @@ find_package(CLI11 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(taglib CONFIG REQUIRED)
 
-add_executable(audio-warden main.cpp)
+add_executable(audio-warden
+    main.cpp
+    audio_warden.cpp
+)
 target_link_libraries(audio-warden PRIVATE CLI11::CLI11 nlohmann_json::nlohmann_json TagLib::tag)
