@@ -2,10 +2,11 @@
 
 To maintain a clean and modular C++ codebase, AudioWarden is divided into several conceptual "Agents" or Subsystems. Each subsystem has a single, strictly defined responsibility.
 
-These are current design boundaries, not yet one-to-one source files. The CLI
-bootstrap lives in `main.cpp`, shared data models live in `models.h`, and the
-current end-to-end scan/validate/prompt/modify pipeline is exposed through
-`app.h` with its transitional implementation in `audio_warden_pipeline.inl`.
+These are current design boundaries, with the implementation now split across
+focused source files. The CLI bootstrap lives in `main.cpp`, shared data models
+live in `models.h`, orchestration lives in `audio_warden.cpp`, discovery and tag
+reading live in `scanner.cpp`, rule checks live in `validator.cpp`, and prompts
+plus approved writes live in `prompter.cpp`.
 
 ## 1. The Scanner (`LibraryScanner`)
 **Responsibility:** Discovery and categorization.
@@ -21,8 +22,9 @@ current end-to-end scan/validate/prompt/modify pipeline is exposed through
     omitted, the fallback list is `soundtracks`, `childrens`, and
     `various artists`.
 *   Currently marks folders named `singles`, `loose tracks`, or `standalone` as
-    standalone directories so their track filenames can omit the track-number
-    prefix.
+    standalone directories, plus any lower-cased entry in the `rules.json`
+    `standalone_folders` list, so their track filenames can omit the
+    track-number prefix.
 *   Planned: identify banned files (e.g., `.lrc`) and ignored files.
 *   Planned: make disc-folder patterns configurable.
 *   *Constraint:* Purely read-only. Parses paths and groups files logically into `Album` or `Track` objects.
@@ -44,7 +46,7 @@ current end-to-end scan/validate/prompt/modify pipeline is exposed through
     names such as `Vol. 01 - Title`.
 *   Currently detects legacy ID3v2 date-frame warnings (`TDAT`, `TYER`, `TIME`,
     `TORY`, `TRDA`) from TagLib debug output.
-*   Currently warns about likely re-release/remaster albums when the folder year
+*   Planned: warn about likely re-release/remaster albums when the folder year
     is at least ten years earlier than the release year tag and the original
     year tag does not already match the folder year.
 *   Planned: generate formal `Violation` objects (e.g., `MissingTechnicalInfo`, `BannedOffsetDetected`, `TrackNamingMismatch`).
@@ -68,7 +70,7 @@ current end-to-end scan/validate/prompt/modify pipeline is exposed through
     with `std::filesystem::rename`.
 *   Currently executes approved file renames with `std::filesystem::rename`.
 *   Currently executes approved legacy tag cleanup with `TagLib::FileRef::save()`.
-*   Currently executes approved original-year tag updates and optional album
+*   Planned: execute approved original-year tag updates and optional album
     edition suffix updates with TagLib property/tag writes.
 *   Planned: receive heavily vetted and user-approved `ActionList` commands.
 *   Planned: synced-lyrics updates, folder changes, rollback capabilities, and stronger mid-batch recovery.

@@ -25,13 +25,14 @@ AudioWarden currently enforces a focused subset of these rules:
     underscores to ` - `.
 *   Detects legacy ID3v2 date frames (`TDAT`, `TYER`, `TIME`, `TORY`, `TRDA`)
     when TagLib reports them.
-*   Suggests original-year tag updates for likely re-releases/remasters when the
-    folder year is at least ten years earlier than the release year tag.
+*   Retains release-year metadata separately so future re-release/remaster
+    checks can compare it with original-year metadata.
 *   In interactive mode, can batch-rename folders, disc subfolders, files, and
     save affected tags after user approval.
 
-Configurable disc-folder and standalone-folder classification, banned `.lrc`
-handling, and synced-lyrics offset repair are still planned rule areas.
+Configurable disc-folder classification, loose standalone-file detection,
+banned `.lrc` handling, original-year repair prompts, and synced-lyrics offset
+repair are still planned rule areas.
 
 ## Core Philosophy: User Approval Required
 
@@ -188,12 +189,10 @@ In `--dry-run` mode, approved tag updates are printed without writing changes.
 
 ## Original Year vs Release Year
 
-AudioWarden treats the album folder year as the original album year. The normal
-TagLib year is retained separately as the release year so re-releases and
-remasters can be detected.
+AudioWarden treats the album folder year as the original album year. The scanner
+reads `ORIGINALYEAR` or `ORIGINALDATE` when available and retains the normal
+TagLib year separately as the release year.
 
-If a folder year is at least ten years earlier than the release year tag and the
-track does not already carry a matching original-year value, interactive mode
-offers to write `ORIGINALYEAR` for every track in the album. The prompt also
-allows optional edition text to be appended to the album tag, such as
-`Remastered` or `Deluxe Edition`.
+**Status:** Re-release/remaster detection and interactive `ORIGINALYEAR` repair
+prompts are planned. The current validator uses the original-year value when
+building expected folder names, but it does not yet offer tag repair actions.

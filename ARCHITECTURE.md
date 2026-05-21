@@ -1,11 +1,9 @@
 # System Architecture
 
 AudioWarden is currently a single-binary C++17 CLI application. The CLI
-bootstrap now lives in `main.cpp`, while the existing scanner, validator,
-prompter, and modifier pipeline is exposed through `app.h` and compiled via
-`audio_warden.cpp`. The long pipeline implementation remains transitional in
-`audio_warden_pipeline.inl` until it is split into dedicated scanner,
-validator, prompter, and modifier translation units.
+bootstrap lives in `main.cpp`, the orchestration layer lives in
+`audio_warden.cpp`, and the scanner, validator, prompt/write, IO, and TagLib
+debug responsibilities are split into focused translation units.
 
 ## 1. Technology Stack
 
@@ -33,6 +31,7 @@ struct Track {
     std::string artist;
     std::string album;
     unsigned int year;
+    unsigned int release_year;
     int track_number;
     
     // Quality Metrics
@@ -49,6 +48,7 @@ struct Album {
     std::vector<Track> tracks;
     bool is_multi_disc;
     bool is_category_album;
+    bool is_standalone_dir;
 };
 ```
 
@@ -59,7 +59,7 @@ AudioWarden currently reads two configuration files:
 *   `settings.txt`: one library root per line. Blank lines and comments beginning
     with `#` are ignored.
 *   `rules.json`: JSON rules consumed at runtime. The implemented checks use
-    the `file_naming` template.
+    the `file_naming`, `category_folders`, and `standalone_folders` values.
 
 The CLI requires `--rules` / `-r` and supports:
 
@@ -75,9 +75,9 @@ The CLI requires `--rules` / `-r` and supports:
      so prompts remain readable.
    * Parse CLI arguments via CLI11.
    * Load JSON rules and library roots from `settings.txt`.
-2. **Library Pipeline (`audio_warden_pipeline.inl`)**
-   * `scan_library` owns the current end-to-end album scan, validation prompt,
-     and approved-write flow.
+2. **Library Pipeline (`audio_warden.cpp`)**
+   * `scan_library` coordinates discovery, worker parsing, folder validation,
+     track validation, prompts, and approved writes.
 3. **Discovery Thread**
    * Recursively traverses each configured library root with
      `std::filesystem::recursive_directory_iterator`.
@@ -93,8 +93,9 @@ The CLI requires `--rules` / `-r` and supports:
      album root and recognized disc subfolders.
    * Use `TagLib::FileRef` to read title, artist, album, year, track number,
      bitrate, sample rate, FLAC bit depth, and legacy date-frame warnings.
-   * Apply a hard-coded category-album heuristic for parent folders named
-     `soundtracks`, `childrens`, or `various artists`.
+   * Apply `rules.json` `category_folders` and `standalone_folders`
+     classification, with defaults for common category and loose-track folder
+     names.
    * Push populated `Album` objects into a thread-safe queue.
 5. **Folder Validation and Prompts**
    * Builds expected standard album folder names from tag year, tag album name,
@@ -116,6 +117,7 @@ The CLI requires `--rules` / `-r` and supports:
      underscores.
    * Reports space-vs-underscore differences as a specific mismatch reason when
      the normalized names otherwise match.
+   * Allows standalone directories to omit the configured track-number prefix.
    * Reports legacy ID3v2 date frames as a batch warning.
 7. **Approved Writes**
    * In interactive mode, approved folder, subfolder, and filename batches are
@@ -131,10 +133,11 @@ The CLI requires `--rules` / `-r` and supports:
 The following documented rule areas are not yet implemented in the current
 pipeline:
 
-*   Configurable category-folder and disc-folder classification rules.
-*   Standalone single detection.
+*   Configurable disc-folder classification rules.
+*   Loose standalone single detection outside configured standalone directories.
 *   `.lrc` detection, embedding, and deletion.
 *   Embedded synced-lyrics offset adjustment.
+*   Re-release/remaster original-year repair prompts.
 *   Dedicated `Violation`, `ActionList`, rollback, and modifier abstractions.
 
 ## 6. Codebase Guidelines
@@ -145,7 +148,6 @@ To ensure the codebase remains maintainable and to optimize context window usage
 If a file begins to significantly exceed this limit, it is a strong indicator
 that it has taken on too many responsibilities and should be refactored into
 smaller, modular components following the subsystem boundaries outlined in
-`AGENTS.md`. `main.cpp` is now intentionally small; the remaining large
-transitional implementation is `audio_warden_pipeline.inl`, which should be the
-next target for extraction into scanner, validator, prompter, and modifier
-modules.
+`AGENTS.md`. Current source and header files are kept under a few hundred lines
+each. New behavior should continue to land in the focused module that owns it
+rather than re-growing the orchestration layer.

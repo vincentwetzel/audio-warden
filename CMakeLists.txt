@@ -12,5 +12,10 @@ find_package(taglib CONFIG REQUIRED)
 add_executable(audio-warden
     main.cpp
     audio_warden.cpp
+    io_utils.cpp
+    prompter.cpp
+    scanner.cpp
+    tag_debug.cpp
+    validator.cpp
 )
 target_link_libraries(audio-warden PRIVATE CLI11::CLI11 nlohmann_json::nlohmann_json TagLib::tag)

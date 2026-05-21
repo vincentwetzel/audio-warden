@@ -4,6 +4,7 @@ settings.json
 
 # Editor/workspace configuration
 .vscode/
+.VSCodeCounter/
 launch.json
 tasks.json
 
